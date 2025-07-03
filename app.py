@@ -1,5 +1,6 @@
 from pathlib import Path
 import PIL
+import ultralytics
 import streamlit as st
 import settings
 import helper
@@ -7,6 +8,7 @@ from PIL import Image
 import os
 from streamlit_cropper import st_cropper
 import time
+
 
 st.set_page_config(
     page_title="Dental Image Segmentation and Detection",
