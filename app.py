@@ -9,6 +9,17 @@ import os
 from streamlit_cropper import st_cropper
 import time
 
+page_bg_img = f"""
+<style>
+.stApp, .stSidebar {{
+background: #dce3cf;
+background: linear-gradient(358deg, rgba(220, 227, 207, 1) 0%, rgba(211, 227, 211, 1) 50%, rgba(151, 199, 194, 1) 100%);
+}}
+</style>
+"""
+
+st.markdown(page_bg_img, unsafe_allow_html=True)
+
 
 st.set_page_config(
     page_title="Dental Image Segmentation and Detection",
@@ -202,3 +213,9 @@ if source_radio == settings.IMAGE:
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+        
+        st.divider()
+        
+        # LLM Feature
+        st.title("Use AI for labeling or to correct any label for the selected region")
+        
