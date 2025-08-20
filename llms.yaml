@@ -1,5 +1,0 @@
-servers:
-  - name: server1
-    class: langchain_openai.ChatOpenAI
-    model: gpt-4o-mini
-    temperature: 0

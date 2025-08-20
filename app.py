@@ -9,6 +9,16 @@ import os
 from streamlit_cropper import st_cropper
 import time
 
+
+import io
+from dotenv import load_dotenv
+import google.generativeai as genai
+
+import shutil
+from glob import glob
+
+import re 
+
 page_bg_img = f"""
 <style>
 .stApp, .stSidebar {{
@@ -99,7 +109,8 @@ if source_radio == settings.IMAGE:
                         progress_bar.progress(percent_complete)
                     progress_bar.empty()
 
-                st.session_state.img_file = uploaded_image  # Save the uploaded image to session state
+                # Save the uploaded image to session state
+                st.session_state.img_file = uploaded_image
                 st.image(source_img, caption="Uploaded Image Successfully")
 
         except Exception as ex:
@@ -123,12 +134,13 @@ if source_radio == settings.IMAGE:
                 res = model.predict(uploaded_image, conf=confidence)
                 boxes = res[0].boxes
                 res_plotted = res[0].plot(labels=False)[:, :, ::-1]
-                st.session_state.img_file = Image.fromarray(res_plotted)  # Update session state with detected image
+                # Update session state with detected image
+                st.session_state.img_file = Image.fromarray(res_plotted)
                 st.session_state.img_file.save("detected_image.jpg")
                 Image.open("detected_image.jpg")
 
     with st.container():
-        
+
         # Check `custom-labels` folder exists
         os.makedirs("custom-labels", exist_ok=True)
 
@@ -143,7 +155,8 @@ if source_radio == settings.IMAGE:
             # Save label to custom-labels folder
             label_path = os.path.join("custom-labels", f"{filename}.txt")
             with open(label_path, "w") as f:
-                f.write(f"{label} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+                f.write(
+                    f"{label} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
 
             # Save cropped image to custom-labels folder
             image_path = os.path.join("custom-labels", f"{filename}.jpg")
@@ -157,7 +170,7 @@ if source_radio == settings.IMAGE:
             path = os.path.join("custom-labels", f"{filename}.jpg")
             image.save(path)
             st.success(f"Cropped image saved as {path}")
-        
+
         st.divider()
         # Streamlit UI setup
         st.title("Annotation Tool")
@@ -190,7 +203,8 @@ if source_radio == settings.IMAGE:
 
                 # Input for label
                 st.header("Enter Label for the bounding box and then hit enter:")
-                st.session_state.label = st.text_input("Enter Label here: ", st.session_state.label)
+                st.session_state.label = st.text_input(
+                    "Enter Label here: ", st.session_state.label)
                 st.header(f"Entered Label:'{st.session_state.label}'")
 
                 # Check if label is empty
@@ -205,7 +219,8 @@ if source_radio == settings.IMAGE:
                     # Use `source_img.name` to get the file name for saving
                     filename = os.path.splitext(source_img.name)[0]
                     if st.button("Save Cropped Image"):
-                        save_cropped_image(st.session_state.cropped_img, filename)
+                        save_cropped_image(
+                            st.session_state.cropped_img, filename)
 
                     if st.button("Save YOLO Label"):
                         save_img_label_yolo_format(
@@ -213,9 +228,156 @@ if source_radio == settings.IMAGE:
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
-        
+
         st.divider()
-        
+
         # LLM Feature
-        st.title("Use AI for labeling or to correct any label for the selected region")
-        
+
+        # Setup
+        st.set_page_config(page_title="Gemini Dental Analyzer", layout="wide")
+        st.title("Gemini 1.5 Flash - Cropped Tooth Disease Detection")
+
+        # Load the API key
+        load_dotenv()
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        if not GEMINI_API_KEY:
+            st.error("GEMINI_API_KEY not found.")
+            st.stop()
+
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        # Session State
+        if "latest_image_path" not in st.session_state:
+            st.session_state.latest_image_path = None
+        if "image_saved" not in st.session_state:
+            st.session_state.image_saved = False
+
+        # Helpers
+        def pil_to_bytes(img: Image.Image) -> bytes:
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG")
+            return buf.getvalue()
+
+        def sanitize_class_name(name: str) -> str:
+            """Ensure YOLO label is a single safe word (underscores allowed)."""
+            name = name.strip().lower()
+            name = name.replace(" ", "_")          # spaces → underscore
+            name = re.sub(r"[^a-z0-9_]", "", name) # remove unwanted chars
+            # Keep only first token to enforce single word
+            if "_" in name:
+                tokens = [t for t in name.split("_") if t]
+                name = "_".join(tokens[:2]) if tokens else "unknown"
+            return name if name else "unknown"
+
+        def gemini_analyze(image_bytes: bytes, prompt_text: str) -> str:
+            image_part = {"mime_type": "image/jpeg", "data": image_bytes}
+            resp = model.generate_content([prompt_text, image_part])
+            raw_label = getattr(resp, "text", "").strip() or "unknown"
+            return sanitize_class_name(raw_label)
+
+        def get_latest_file(folder="custom-labels", ext_list=[".jpg", ".jpeg", ".png"]):
+            folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), folder)
+            if not os.path.exists(folder_path):
+                return None
+            files = [os.path.join(folder_path, f) for f in os.listdir(folder_path)
+                    if any(f.lower().endswith(ext) for ext in ext_list)]
+            if not files:
+                return None
+            latest_file = max(files, key=os.path.getctime)
+            return latest_file
+
+        def save_gemini_label_and_image(latest_image_path, gemini_label):
+            # Ensure gemini-label folder exists
+            gemini_folder = "gemini-label"
+            os.makedirs(gemini_folder, exist_ok=True)
+
+            # Copy cropped image
+            image_filename = os.path.basename(latest_image_path)
+            dest_image_path = os.path.join(gemini_folder, image_filename)
+            shutil.copy2(latest_image_path, dest_image_path)
+
+            # Prepare YOLO label file
+            txt_file = os.path.splitext(latest_image_path)[0] + ".txt"
+            save_txt_path = os.path.join(gemini_folder, os.path.splitext(image_filename)[0] + ".txt")
+
+            if os.path.exists(txt_file):
+                with open(txt_file, "r") as f:
+                    lines = f.readlines()
+                new_lines = []
+                for line in lines:
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        # Replace class with sanitized Gemini label
+                        parts[0] = gemini_label
+                        new_lines.append(" ".join(parts))
+                with open(save_txt_path, "w") as f:
+                    f.write("\n".join(new_lines))
+                st.success(f"Gemini-corrected label saved:\n{save_txt_path}\nand image copied to:\n{dest_image_path}")
+            else:
+                # If no original txt exists, create one with dummy bbox
+                line = f"{gemini_label} 0.5 0.5 1 1"
+                with open(save_txt_path, "w") as f:
+                    f.write(line + "\n")
+                st.warning(f"No original label found. Created new YOLO label:\n{save_txt_path}")
+
+        # Main
+        latest_image_path = get_latest_file()
+        if latest_image_path:
+            st.info(f"Latest cropped image: `{latest_image_path}`")
+            img = Image.open(latest_image_path)
+            st.image(img, caption="Latest Cropped Image", use_column_width=True)
+
+            # Initialize session state variables
+            if "gemini_label" not in st.session_state:
+                st.session_state.gemini_label = None
+            if "analysis_done" not in st.session_state:
+                st.session_state.analysis_done = False
+            if "chat_history" not in st.session_state:
+                st.session_state.chat_history = []
+
+            # Gemini Label Generation
+            if st.button("Generate Gemini Label") or st.session_state.analysis_done:
+                if not st.session_state.analysis_done:
+                    st.info("Analyzing the cropped image with Gemini...")
+                    try:
+                        prompt = "Identify the dental disease in this image and return a single safe YOLO class name."
+                        gemini_label = gemini_analyze(pil_to_bytes(img), prompt)
+                        st.session_state.gemini_label = gemini_label
+                        st.session_state.analysis_done = True
+                    except Exception as e:
+                        st.error(f"Error calling Gemini: {e}")
+
+                if st.session_state.gemini_label:
+                    st.success("Gemini Detected Disease:")
+                    st.markdown(f"**{st.session_state.gemini_label}**")
+
+                    # Save Gemini label and image
+                    if st.button("Save Gemini Label and Image"):
+                        save_gemini_label_and_image(latest_image_path, st.session_state.gemini_label)
+
+                    # Gemini Chat
+                    st.divider()
+                    st.subheader("Chat with Gemini about this disease (Assistant to the Dentist/Patient)")
+
+                    # Default prompt based on detected disease
+                    default_prompt = f"Explain more about the dental disease '{st.session_state.gemini_label}' in simple terms."
+
+                    user_input = st.text_input("Ask a question about the disease:", value=default_prompt)
+
+                    if user_input:
+                        try:
+                            image_bytes = pil_to_bytes(img)
+                            resp = model.generate_content([user_input, {"mime_type":"image/jpeg","data":image_bytes}])
+                            reply = getattr(resp, "text", "").strip() or "No response."
+                            st.session_state.chat_history.append((user_input, reply))
+                        except Exception as e:
+                            st.error(f"Error in Gemini chat: {e}")
+
+                    # Display chat history
+                    for q, a in st.session_state.chat_history:
+                        st.markdown(f"**You:** {q}")
+                        st.markdown(f"**Gemini:** {a}")
+
+        else:
+            st.warning("No images found in the `custom-labels/` folder.")
