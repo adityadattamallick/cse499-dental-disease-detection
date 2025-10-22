@@ -19,6 +19,12 @@ from glob import glob
 
 import re 
 
+st.set_page_config(
+    page_title="Dental Image Segmentation and Detection",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 page_bg_img = f"""
 <style>
 .stApp, .stSidebar {{
@@ -31,11 +37,11 @@ background: linear-gradient(358deg, rgba(220, 227, 207, 1) 0%, rgba(211, 227, 21
 st.markdown(page_bg_img, unsafe_allow_html=True)
 
 
-st.set_page_config(
-    page_title="Dental Image Segmentation and Detection",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# st.set_page_config(
+#    page_title="Dental Image Segmentation and Detection",
+#    layout="wide",
+#    initial_sidebar_state="expanded"
+# )
 
 st.title("Dental Image Detection and Prediction Using YOLOv8 and SAM")
 
@@ -234,7 +240,7 @@ if source_radio == settings.IMAGE:
         # LLM Feature
 
         # Setup
-        st.set_page_config(page_title="Gemini Dental Analyzer", layout="wide")
+        # st.set_page_config(page_title="Gemini Dental Analyzer", layout="wide")
         st.title("Gemini 1.5 Flash - Cropped Tooth Disease Detection")
 
         # Load the API key
