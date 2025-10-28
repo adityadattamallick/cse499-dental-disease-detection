@@ -132,7 +132,7 @@ if source_radio == settings.IMAGE:
             st.image(default_detected_image_path, caption='Detected Image', use_container_width=True)
         else:
             # Run detection when button is clicked
-            if st.sidebar.button('Detect Disease'):
+            if st.sidebar.button('Detect Disease and Stuff'):
                 res = model.predict(uploaded_image, conf=confidence)
                 res_plotted = res[0].plot(labels=True)[:, :, ::-1]
                 st.image(res_plotted, caption='Detected Image', use_container_width=True)
