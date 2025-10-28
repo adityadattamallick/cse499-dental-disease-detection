@@ -122,7 +122,7 @@ This is a Senior Design Capstone project. For collaboration or questions, please
 ## Contact
 
 **Project Author**: Aditya Narayan Datta Mallick  
-**Institution**: North South University, Dhaka, Bangladesh 
+**Institution**: North South University, Dhaka, Bangladesh<br /> 
 **Course**: CSE499 - Senior Design & Capstone Project
 <!--##License-->
 
