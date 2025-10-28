@@ -130,7 +130,8 @@ This is a Senior Design Capstone project. For collaboration or questions, please
 
 - YOLOv8 by Ultralytics
 - PyTorch team
-- Saif Ahmed, Dr Nabeel Mohammed
+- Saif Ahmed
+- Dr Nabeel Mohammed
 
 ## References
 

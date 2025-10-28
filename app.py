@@ -7,8 +7,7 @@ This Streamlit application provides:
 3. Gemini AI integration for disease classification and consultation
 4. YOLO format label generation for training data
 
-Author: Your Name
-Date: 2025
+Author: Aditya Narayan Datta Mallick 
 """
 
 from pathlib import Path
