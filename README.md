@@ -89,6 +89,23 @@ The dataset follows YOLOv8 annotation standards where each image has a correspon
 class_id center_x center_y width height
 ```
 
+## Dataset Details
+
+The dataset comprises multiple classes of dental conditions and diseases. Below are the detailed class mappings used in this project:
+
+<div align="center">
+  <img src="dataset-class-mapping/dataset_class_table-1.jpg" alt="Dataset Class Mapping Table 1" width="800"/>
+  <br/>
+  <em>Dataset Class Mapping - Part 1</em>
+  <br/><br/>
+  
+  <img src="dataset-class-mapping/dataset_class_table-2.jpg" alt="Dataset Class Mapping Table 2" width="800"/>
+  <br/>
+  <em>Dataset Class Mapping - Part 2</em>
+</div>
+
+These tables provide comprehensive information about the disease classes, their identifiers, and categorization used for training and evaluation.
+
 ## Model Performance
 
 - **Metrics**
@@ -124,7 +141,34 @@ This is a Senior Design Capstone project. For collaboration or questions, please
 **Project Author**: Aditya Narayan Datta Mallick  
 **Institution**: North South University, Dhaka, Bangladesh<br /> 
 **Course**: CSE499 - Senior Design & Capstone Project
-<!--##License-->
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+```
+MIT License
+
+Copyright (c) 2025 Aditya Narayan Datta Mallick
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
 
 ## Acknowledgments
 
@@ -141,4 +185,3 @@ This is a Senior Design Capstone project. For collaboration or questions, please
 
 ---
 
-**Note**: This project is part of academic research for CSE499 Senior Design & Capstone Project from Department of Electrical and Computer Engineering (ECE), Dhaka, Bangladesh.
