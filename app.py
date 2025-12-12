@@ -24,6 +24,8 @@ from PIL import Image
 from dotenv import load_dotenv
 import google.generativeai as genai
 
+import numpy as np
+
 import settings
 import helper
 
@@ -82,7 +84,7 @@ if "original_uploaded_img" not in st.session_state:
 st.sidebar.header("DL Model Configuration")
 
 # Model type selection
-model_type = st.sidebar.radio("Choose Task", ["Detection", "Segmentation"])
+model_type = st.sidebar.radio("Choose Task", ["Detection with Segmentation Masks"])
 
 # Confidence threshold slider
 confidence = float(st.sidebar.slider("Confidence Threshold (%)", 15, 100, 21)) / 100
