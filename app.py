@@ -85,7 +85,7 @@ st.sidebar.header("DL Model Configuration")
 model_type = st.sidebar.radio("Choose Task", ["Detection", "Segmentation"])
 
 # Confidence threshold slider
-confidence = float(st.sidebar.slider("Confidence Threshold (%)", 25, 100, 30)) / 100
+confidence = float(st.sidebar.slider("Confidence Threshold (%)", 15, 100, 21)) / 100
 
 # Load the selected model
 model_path = Path(
@@ -100,7 +100,7 @@ except Exception as ex:
     st.error(ex)
 
 # SIDEBAR: IMAGE SOURCE 
-st.sidebar.header("Image Config")
+st.sidebar.header("Image Configuration")
 source_radio = st.sidebar.radio("Select Your Source", settings.SOURCES_LIST)
 
 # IMAGE UPLOAD AND DETECTION 
@@ -147,7 +147,7 @@ if source_radio == settings.IMAGE:
             )
         else:
             # Run detection when button is clicked
-            if st.sidebar.button("Detect Disease and Stuff"):
+            if st.sidebar.button("Detect Disease"):
                 res = model.predict(uploaded_image, conf=confidence)
                 res_plotted = res[0].plot(labels=True)[:, :, ::-1]
                 st.image(
@@ -873,7 +873,7 @@ if st.session_state.cropped_img and st.session_state.crop_rect:
             st.divider()
             st.subheader("Chat with Gemini about this diagnosis")
             
-            default_question = f"Explain '{st.session_state.gemini_label}' in simple terms. What causes it and what treatment is recommended?"
+            default_question = f"Explain '{st.session_state.gemini_label}', its causes, prevention and treatment."
             user_input = st.text_input("Ask a question:", value=default_question)
             
             if st.button("Ask Gemini") and user_input:

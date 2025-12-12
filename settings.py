@@ -24,11 +24,11 @@ IMAGES_DIR = ROOT / 'images'
 
 # Default images for the application
 DEFAULT_IMAGE = IMAGES_DIR / 'tooth-decay-image.jpg'
-DEFAULT_DETECT_IMAGE = IMAGES_DIR / 'tooth-decay-image.jpg'
+DEFAULT_DETECT_IMAGE = IMAGES_DIR / 'detected-image.jpg'
 
 # Model weights directory
 MODEL_DIR = ROOT / 'weights'
 
 # Pre-trained model paths
 DETECTION_MODEL = MODEL_DIR / 'best.pt'  # Custom trained detection model
-SEGMENTATION_MODEL = MODEL_DIR / 'yolov8s-seg.pt'  # YOLOv8 segmentation model
+SEGMENTATION_MODEL = MODEL_DIR / 'best.pt'  # YOLOv8 segmentation model
