@@ -79,6 +79,8 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "original_uploaded_img" not in st.session_state:
     st.session_state.original_uploaded_img = None
+if "original_image_filename" not in st.session_state:
+    st.session_state.original_image_filename = None
 
 # SIDEBAR: MODEL CONFIGURATION
 st.sidebar.header("DL Model Configuration")
@@ -133,6 +135,8 @@ if source_radio == settings.IMAGE:
                 progress_bar.empty()
                 st.session_state.img_file = uploaded_image
                 st.session_state.original_uploaded_img = uploaded_image
+                # Store original filename without extension
+                st.session_state.original_image_filename = os.path.splitext(source_img.name)[0]
                 st.image(source_img, caption="Uploaded Image Successfully")
         except Exception as ex:
             st.error(f"Error loading image: {ex}")
@@ -204,6 +208,15 @@ crop_result = st_cropper(
 
 # Store crop coordinates and create cropped image
 if crop_result is not None:
+    # Check if crop has changed (compare with previous crop)
+    crop_changed = (
+        st.session_state.crop_rect is None or
+        crop_result["left"] != st.session_state.crop_rect["left"] or
+        crop_result["top"] != st.session_state.crop_rect["top"] or
+        crop_result["width"] != st.session_state.crop_rect["width"] or
+        crop_result["height"] != st.session_state.crop_rect["height"]
+    )
+    
     st.session_state.crop_rect = crop_result
     # Manually crop using rectangle coordinates from original image
     left = crop_result["left"]
@@ -213,6 +226,12 @@ if crop_result is not None:
     st.session_state.cropped_img = img_file.crop(
         (left, top, left + width, top + height)
     )
+    
+    # Reset analysis when crop changes
+    if crop_changed:
+        st.session_state.analysis_done = False
+        st.session_state.gemini_label = None
+        st.session_state.chat_history = []  # Also clear chat history
 
 # Display cropped preview
 st.header("Cropped Image Preview:")
@@ -257,7 +276,8 @@ def get_unique_filename():
 
 def save_img_label_yolo_format(img_width, img_height, crop_rect, label, cropped_img):
     """
-    Save cropped image and corresponding YOLO format label.
+    Save cropped image and append YOLO format label to existing label file.
+    Uses original image filename to group all annotations together.
 
     YOLO format: <class> <x_center> <y_center> <width> <height>
     All coordinates are normalized (0-1) relative to original image dimensions.
@@ -269,8 +289,13 @@ def save_img_label_yolo_format(img_width, img_height, crop_rect, label, cropped_
         label (str): Class label for the bounding box
         cropped_img (PIL.Image): The cropped image to save
     """
-    filename = get_unique_filename()
-
+    # Use original filename or fallback to UUID if not available
+    if st.session_state.original_image_filename:
+        base_filename = st.session_state.original_image_filename
+    else:
+        base_filename = get_unique_filename()
+        st.warning("Original filename not found, using UUID instead.")
+    
     # Extract absolute crop coordinates from original image
     x_min = crop_rect["left"]
     y_min = crop_rect["top"]
@@ -290,18 +315,23 @@ def save_img_label_yolo_format(img_width, img_height, crop_rect, label, cropped_
     if cropped_img.mode in ("RGBA", "LA"):
         cropped_img = cropped_img.convert("RGB")
 
-    # Save YOLO format label file
-    label_path = os.path.join("custom-labels", f"{filename}.txt")
-    with open(label_path, "w") as f:
+    # APPEND to existing label file (not overwrite)
+    label_path = os.path.join("custom-labels", f"{base_filename}.txt")
+    with open(label_path, "a") as f:  # Changed from "w" to "a" for append
         f.write(
             f"{label} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n"
         )
 
-    # Save cropped image
-    image_path = os.path.join("custom-labels", f"{filename}.jpg")
+    # Save cropped image with incremental suffix
+    # Count existing crops for this image
+    existing_crops = [f for f in os.listdir("custom-labels") 
+                      if f.startswith(base_filename) and f.endswith(".jpg")]
+    crop_number = len(existing_crops)
+    
+    image_path = os.path.join("custom-labels", f"{base_filename}_crop{crop_number}.jpg")
     cropped_img.save(image_path)
 
-    st.success(f"Saved crop and label:\n- {image_path}\n- {label_path}")
+    st.success(f"Saved crop #{crop_number} and appended label:\n- {image_path}\n- {label_path}")
     st.info(
         f"YOLO coords: class={label}, x_center={x_center:.4f}, y_center={y_center:.4f}, width={width_norm:.4f}, height={height_norm:.4f}"
     )
@@ -433,13 +463,11 @@ def save_gemini_label_and_image(latest_image_path, gemini_label):
         )
 
 
-# Save image and label
-
 def save_original_with_yolo_label(
     img_width, img_height, crop_rect, label, original_img
 ):
     """
-    Save the original full-size image along with YOLO format label.
+    Save the original full-size image once and append YOLO label to its label file.
     This preserves the complete context while still marking the detected region.
 
     Args:
@@ -449,8 +477,13 @@ def save_original_with_yolo_label(
         label (str): Class label for the bounding box
         original_img (PIL.Image): The original full-size image to save
     """
-    filename = get_unique_filename()
-
+    # Use original filename or fallback to UUID
+    if st.session_state.original_image_filename:
+        base_filename = st.session_state.original_image_filename
+    else:
+        base_filename = get_unique_filename()
+        st.warning("Original filename not found, using UUID instead.")
+    
     # Extract absolute crop coordinates from original image
     x_min = crop_rect["left"]
     y_min = crop_rect["top"]
@@ -470,18 +503,26 @@ def save_original_with_yolo_label(
     if original_img.mode in ("RGBA", "LA"):
         original_img = original_img.convert("RGB")
 
-    # Save YOLO format label file
-    label_path = os.path.join("original-labels", f"{filename}.txt")
-    with open(label_path, "w") as f:
+    # APPEND to existing label file
+    label_path = os.path.join("original-labels", f"{base_filename}.txt")
+    with open(label_path, "a") as f:  # Changed from "w" to "a"
         f.write(
             f"{label} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n"
         )
 
-    # Save original full-size image
-    image_path = os.path.join("original-labels", f"{filename}.jpg")
-    original_img.save(image_path)
-
-    st.success(f"Saved original image and label:\n- {image_path}\n- {label_path}")
+    # Save original image only if it doesn't exist
+    image_path = os.path.join("original-labels", f"{base_filename}.jpg")
+    if not os.path.exists(image_path):
+        original_img.save(image_path)
+        st.success(f"Saved original image: {image_path}")
+    else:
+        st.info(f"Original image already exists: {image_path}")
+    
+    # Count total annotations
+    with open(label_path, "r") as f:
+        num_annotations = len(f.readlines())
+    
+    st.success(f"Appended annotation to label file (total: {num_annotations}):\n- {label_path}")
     st.info(
         f"YOLO coords: class={label}, x_center={x_center:.4f}, y_center={y_center:.4f}, width={width_norm:.4f}, height={height_norm:.4f}"
     )
@@ -635,18 +676,6 @@ gemini_model = genai.GenerativeModel(
     generation_config=generation_config
 )
 
-# Define the 44 dental classes as per dataset
-DENTAL_CLASSES = [
-    '11', '12', '13', '14', '15', '16', '17', '18', 
-    '21', '22', '23', '24', '25', '26', '27', '28', 
-    '31', '32', '33', '34', '35', '36', '37', '38', 
-    '41', '42', '43', '44', '45', '46', '47', '48', 
-    'amalgam filling', 'calculus', 'fixed prosthesis', 'incisive papilla', 
-    'non-carious lesion', 'palatine raphe', 'staining or visible changes without cavitation', 
-    'temporary restoration', 'tongue', 'tooth coloured filling', 
-    'visible changes with cavitation', 'visible changes with microcavitation'
-]
-
 # IMPROVED PROMPT: More detailed and structured
 PROMPT_FILE = "gemini_prompt.txt"
 IMPROVED_PROMPT = """You are an expert dental diagnostician analyzing a cropped dental image.
@@ -724,8 +753,7 @@ def map_class_to_id(class_name: str) -> int:
 
 def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
     """
-    Save YOLO format label with Gemini-predicted class and original full image.
-    Scales crop coordinates from detected image to original image dimensions.
+    Append Gemini-predicted YOLO label to existing label file for original image.
     """
     # Map class name to ID
     class_id = map_class_to_id(class_name)
@@ -734,7 +762,12 @@ def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
         st.error(f"Could not map '{class_name}' to any of the 44 classes. Using class 0 as fallback.")
         class_id = 0
     
-    filename = get_unique_filename()
+    # Use original filename or fallback to UUID
+    if st.session_state.original_image_filename:
+        base_filename = st.session_state.original_image_filename
+    else:
+        base_filename = get_unique_filename()
+        st.warning("Original filename not found, using UUID instead.")
     
     # Get dimensions of both images
     detected_width, detected_height = detected_img.size
@@ -760,7 +793,7 @@ def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
     x_max = x_min + scaled_crop_rect["width"]
     y_max = y_min + scaled_crop_rect["height"]
     
-    # Convert to YOLO format (normalized to ORIGINAL image dimensions)
+    # Convert to YOLO format
     x_center = (x_min + x_max) / 2 / orig_width
     y_center = (y_min + y_max) / 2 / orig_height
     width_norm = scaled_crop_rect["width"] / orig_width
@@ -773,20 +806,26 @@ def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
     if original_img.mode in ("RGBA", "LA"):
         original_img = original_img.convert("RGB")
     
-    # Save YOLO format label file
-    label_path = os.path.join("gemini-labels", f"{filename}.txt")
-    with open(label_path, "w") as f:
+    # APPEND to existing label file
+    label_path = os.path.join("gemini-labels", f"{base_filename}.txt")
+    with open(label_path, "a") as f:  # Changed from "w" to "a"
         f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n")
     
-    # Save original image
-    image_path = os.path.join("gemini-labels", f"{filename}.jpg")
-    original_img.save(image_path)
+    # Save original image only if it doesn't exist
+    image_path = os.path.join("gemini-labels", f"{base_filename}.jpg")
+    if not os.path.exists(image_path):
+        original_img.save(image_path)
+        st.success(f"Saved original image: {image_path}")
+    else:
+        st.info(f"Original image already exists: {image_path}")
     
-    st.success(f"Saved Gemini prediction:\n- Image: {image_path}\n- Label: {label_path}")
+    # Count total annotations
+    with open(label_path, "r") as f:
+        num_annotations = len(f.readlines())
+    
+    st.success(f"Appended Gemini prediction (total: {num_annotations}):\n- {label_path}")
     st.info(f"Class: {class_name} (ID: {class_id})\n"
-            f"YOLO: [{class_id}, {x_center:.4f}, {y_center:.4f}, {width_norm:.4f}, {height_norm:.4f}]\n"
-            f"Original img: {orig_width}x{orig_height}, Detected img: {detected_width}x{detected_height}")
-
+            f"YOLO: [{class_id}, {x_center:.4f}, {y_center:.4f}, {width_norm:.4f}, {height_norm:.4f}]")
 
 # Main Gemini Analysis Section
 if st.session_state.cropped_img and st.session_state.crop_rect:
