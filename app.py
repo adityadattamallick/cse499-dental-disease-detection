@@ -29,7 +29,7 @@ import numpy as np
 import settings
 import helper
 
-# PAGE CONFIGURATION 
+# PAGE CONFIGURATION
 st.set_page_config(
     page_title="Dental Image Segmentation and Detection",
     layout="wide",
@@ -62,7 +62,7 @@ padding-top: 2rem !important;
 st.markdown(page_bg_img, unsafe_allow_html=True)
 st.title("Dental Image Detection and Annotation Application")
 
-# SESSION STATE INITIALIZATION 
+# SESSION STATE INITIALIZATION
 if "img_file" not in st.session_state:
     st.session_state.img_file = None
 if "cropped_img" not in st.session_state:
@@ -86,10 +86,12 @@ if "original_image_filename" not in st.session_state:
 st.sidebar.header("DL Model Configuration")
 
 # Model type selection
-model_type = st.sidebar.radio("Choose Task", ["Detection with Segmentation Masks"])
+model_type = st.sidebar.radio(
+    "Choose Task", ["Detection with Segmentation Masks"])
 
 # Confidence threshold slider
-confidence = float(st.sidebar.slider("Confidence Threshold (%)", 15, 100, 21)) / 100
+confidence = float(st.sidebar.slider(
+    "Confidence Threshold (%)", 15, 100, 21)) / 100
 
 # Load the selected model
 model_path = Path(
@@ -103,11 +105,11 @@ except Exception as ex:
     st.error(f"Error loading model from path: {model_path}")
     st.error(ex)
 
-# SIDEBAR: IMAGE SOURCE 
+# SIDEBAR: IMAGE SOURCE
 st.sidebar.header("Image Configuration")
 source_radio = st.sidebar.radio("Select Your Source", settings.SOURCES_LIST)
 
-# IMAGE UPLOAD AND DETECTION 
+# IMAGE UPLOAD AND DETECTION
 source_img = None
 if source_radio == settings.IMAGE:
     source_img = st.sidebar.file_uploader(
@@ -123,7 +125,7 @@ if source_radio == settings.IMAGE:
                 default_image_path = str(settings.DEFAULT_IMAGE)
                 default_image = Image.open(default_image_path)
                 st.image(
-                    default_image, caption="Default Image", use_container_width=True
+                    default_image, caption="Default Image", width=365
                 )
             else:
                 # Display uploaded image with progress bar
@@ -136,8 +138,10 @@ if source_radio == settings.IMAGE:
                 st.session_state.img_file = uploaded_image
                 st.session_state.original_uploaded_img = uploaded_image
                 # Store original filename without extension
-                st.session_state.original_image_filename = os.path.splitext(source_img.name)[0]
-                st.image(source_img, caption="Uploaded Image Successfully")
+                st.session_state.original_image_filename = os.path.splitext(source_img.name)[
+                    0]
+                st.image(
+                    source_img, caption="Uploaded Image Successfully", width=365)
         except Exception as ex:
             st.error(f"Error loading image: {ex}")
 
@@ -149,7 +153,7 @@ if source_radio == settings.IMAGE:
             st.image(
                 default_detected_image_path,
                 caption="Detected Image",
-                use_container_width=True,
+                width=365,
             )
         else:
             # Run detection when button is clicked
@@ -157,19 +161,20 @@ if source_radio == settings.IMAGE:
                 res = model.predict(uploaded_image, conf=confidence)
                 res_plotted = res[0].plot(labels=True)[:, :, ::-1]
                 st.image(
-                    res_plotted, caption="Detected Image", use_container_width=True
+                    res_plotted, caption="Detected Image", width=365
                 )
                 # Save detected image for annotation
                 st.session_state.img_file = Image.fromarray(res_plotted)
                 st.session_state.img_file.save("detected_image.jpg")
 
-# ANNOTATION TOOL 
+# ANNOTATION TOOL
 st.title("Annotation Tool")
 
 # Cropper configuration
 realtime_update = st.checkbox("Update in Real Time", value=True)
 box_color = st.color_picker("Box Color", value="#0b4cd9")
-aspect_choice = st.radio("Aspect Ratio", options=["1:1", "16:9", "4:3", "2:3", "Free"])
+aspect_choice = st.radio("Aspect Ratio", options=[
+                         "1:1", "16:9", "4:3", "2:3", "Free"])
 aspect_dict = {
     "1:1": (1, 1),
     "16:9": (16, 9),
@@ -194,7 +199,7 @@ img_width, img_height = img_file.size
 
 # Display original predicted image
 st.header("Predicted Image (Original Size)")
-st.image(img_file, width=img_width)
+st.image(img_file, width=365)
 
 # Interactive cropping tool
 st.header("Edit Bounding Boxes")
@@ -216,7 +221,7 @@ if crop_result is not None:
         crop_result["width"] != st.session_state.crop_rect["width"] or
         crop_result["height"] != st.session_state.crop_rect["height"]
     )
-    
+
     st.session_state.crop_rect = crop_result
     # Manually crop using rectangle coordinates from original image
     left = crop_result["left"]
@@ -226,7 +231,7 @@ if crop_result is not None:
     st.session_state.cropped_img = img_file.crop(
         (left, top, left + width, top + height)
     )
-    
+
     # Reset analysis when crop changes
     if crop_changed:
         st.session_state.analysis_done = False
@@ -240,13 +245,13 @@ if st.session_state.cropped_img:
 
 # Define the 44 dental classes as per dataset
 DENTAL_CLASSES = [
-    '11', '12', '13', '14', '15', '16', '17', '18', 
-    '21', '22', '23', '24', '25', '26', '27', '28', 
-    '31', '32', '33', '34', '35', '36', '37', '38', 
-    '41', '42', '43', '44', '45', '46', '47', '48', 
-    'amalgam filling', 'calculus', 'fixed prosthesis', 'incisive papilla', 
-    'non-carious lesion', 'palatine raphe', 'staining or visible changes without cavitation', 
-    'temporary restoration', 'tongue', 'tooth coloured filling', 
+    '11', '12', '13', '14', '15', '16', '17', '18',
+    '21', '22', '23', '24', '25', '26', '27', '28',
+    '31', '32', '33', '34', '35', '36', '37', '38',
+    '41', '42', '43', '44', '45', '46', '47', '48',
+    'amalgam filling', 'calculus', 'fixed prosthesis', 'incisive papilla',
+    'non-carious lesion', 'palatine raphe', 'staining or visible changes without cavitation',
+    'temporary restoration', 'tongue', 'tooth coloured filling',
     'visible changes with cavitation', 'visible changes with microcavitation'
 ]
 
@@ -264,7 +269,8 @@ selected_label = st.selectbox(
 
 # Extract just the class ID from selection
 st.session_state.label = selected_label.split(":")[0]
-st.header(f"Selected Label: {st.session_state.label} - {selected_label.split(': ', 1)[1]}")
+st.header(
+    f"Selected Label: {st.session_state.label} - {selected_label.split(': ', 1)[1]}")
 
 # UTILITY FUNCTIONS
 
@@ -295,7 +301,7 @@ def save_img_label_yolo_format(img_width, img_height, crop_rect, label, cropped_
     else:
         base_filename = get_unique_filename()
         st.warning("Original filename not found, using UUID instead.")
-    
+
     # Extract absolute crop coordinates from original image
     x_min = crop_rect["left"]
     y_min = crop_rect["top"]
@@ -324,14 +330,16 @@ def save_img_label_yolo_format(img_width, img_height, crop_rect, label, cropped_
 
     # Save cropped image with incremental suffix
     # Count existing crops for this image
-    existing_crops = [f for f in os.listdir("custom-labels") 
+    existing_crops = [f for f in os.listdir("custom-labels")
                       if f.startswith(base_filename) and f.endswith(".jpg")]
     crop_number = len(existing_crops)
-    
-    image_path = os.path.join("custom-labels", f"{base_filename}_crop{crop_number}.jpg")
+
+    image_path = os.path.join(
+        "custom-labels", f"{base_filename}_crop{crop_number}.jpg")
     cropped_img.save(image_path)
 
-    st.success(f"Saved crop #{crop_number} and appended label:\n- {image_path}\n- {label_path}")
+    st.success(
+        f"Saved crop #{crop_number} and appended label:\n- {image_path}\n- {label_path}")
     st.info(
         f"YOLO coords: class={label}, x_center={x_center:.4f}, y_center={y_center:.4f}, width={width_norm:.4f}, height={height_norm:.4f}"
     )
@@ -400,7 +408,8 @@ def get_latest_file(folder="custom-labels", ext_list=[".jpg", ".jpeg", ".png"]):
     Returns:
         str: Path to latest file, or None if folder is empty
     """
-    folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), folder)
+    folder_path = os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), folder)
     if not os.path.exists(folder_path):
         return None
 
@@ -483,7 +492,7 @@ def save_original_with_yolo_label(
     else:
         base_filename = get_unique_filename()
         st.warning("Original filename not found, using UUID instead.")
-    
+
     # Extract absolute crop coordinates from original image
     x_min = crop_rect["left"]
     y_min = crop_rect["top"]
@@ -517,12 +526,13 @@ def save_original_with_yolo_label(
         st.success(f"Saved original image: {image_path}")
     else:
         st.info(f"Original image already exists: {image_path}")
-    
+
     # Count total annotations
     with open(label_path, "r") as f:
         num_annotations = len(f.readlines())
-    
-    st.success(f"Appended annotation to label file (total: {num_annotations}):\n- {label_path}")
+
+    st.success(
+        f"Appended annotation to label file (total: {num_annotations}):\n- {label_path}")
     st.info(
         f"YOLO coords: class={label}, x_center={x_center:.4f}, y_center={y_center:.4f}, width={width_norm:.4f}, height={height_norm:.4f}"
     )
@@ -729,17 +739,17 @@ with open(PROMPT_FILE, "w") as f:
 def map_class_to_id(class_name: str) -> int:
     """Map class name to YOLO class ID (0-43) with improved fuzzy matching."""
     class_name = class_name.strip().lower()
-    
+
     # Try exact match first
     for idx, dental_class in enumerate(DENTAL_CLASSES):
         if class_name == dental_class.lower():
             return idx
-    
+
     # Try partial match
     for idx, dental_class in enumerate(DENTAL_CLASSES):
         if class_name in dental_class.lower() or dental_class.lower() in class_name:
             return idx
-    
+
     # Try number extraction for tooth numbers
     import re
     numbers = re.findall(r'\d+', class_name)
@@ -747,7 +757,7 @@ def map_class_to_id(class_name: str) -> int:
         tooth_num = numbers[0]
         if tooth_num in DENTAL_CLASSES:
             return DENTAL_CLASSES.index(tooth_num)
-    
+
     return -1  # Unknown class
 
 
@@ -757,27 +767,28 @@ def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
     """
     # Map class name to ID
     class_id = map_class_to_id(class_name)
-    
+
     if class_id == -1:
-        st.error(f"Could not map '{class_name}' to any of the 44 classes. Using class 0 as fallback.")
+        st.error(
+            f"Could not map '{class_name}' to any of the 44 classes. Using class 0 as fallback.")
         class_id = 0
-    
+
     # Use original filename or fallback to UUID
     if st.session_state.original_image_filename:
         base_filename = st.session_state.original_image_filename
     else:
         base_filename = get_unique_filename()
         st.warning("Original filename not found, using UUID instead.")
-    
+
     # Get dimensions of both images
     detected_width, detected_height = detected_img.size
     orig_width, orig_height = original_img.size
-    
+
     # Scale crop coordinates from detected image to original image dimensions
     if (detected_width != orig_width) or (detected_height != orig_height):
         scale_x = orig_width / detected_width
         scale_y = orig_height / detected_height
-        
+
         scaled_crop_rect = {
             "left": int(crop_rect["left"] * scale_x),
             "top": int(crop_rect["top"] * scale_y),
@@ -786,31 +797,32 @@ def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
         }
     else:
         scaled_crop_rect = crop_rect
-    
+
     # Extract absolute crop coordinates from ORIGINAL image
     x_min = scaled_crop_rect["left"]
     y_min = scaled_crop_rect["top"]
     x_max = x_min + scaled_crop_rect["width"]
     y_max = y_min + scaled_crop_rect["height"]
-    
+
     # Convert to YOLO format
     x_center = (x_min + x_max) / 2 / orig_width
     y_center = (y_min + y_max) / 2 / orig_height
     width_norm = scaled_crop_rect["width"] / orig_width
     height_norm = scaled_crop_rect["height"] / orig_height
-    
+
     # Create output directory
     os.makedirs("gemini-labels", exist_ok=True)
-    
+
     # Convert RGBA to RGB if necessary
     if original_img.mode in ("RGBA", "LA"):
         original_img = original_img.convert("RGB")
-    
+
     # APPEND to existing label file
     label_path = os.path.join("gemini-labels", f"{base_filename}.txt")
     with open(label_path, "a") as f:  # Changed from "w" to "a"
-        f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n")
-    
+        f.write(
+            f"{class_id} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n")
+
     # Save original image only if it doesn't exist
     image_path = os.path.join("gemini-labels", f"{base_filename}.jpg")
     if not os.path.exists(image_path):
@@ -818,61 +830,69 @@ def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
         st.success(f"Saved original image: {image_path}")
     else:
         st.info(f"Original image already exists: {image_path}")
-    
+
     # Count total annotations
     with open(label_path, "r") as f:
         num_annotations = len(f.readlines())
-    
-    st.success(f"Appended Gemini prediction (total: {num_annotations}):\n- {label_path}")
+
+    st.success(
+        f"Appended Gemini prediction (total: {num_annotations}):\n- {label_path}")
     st.info(f"Class: {class_name} (ID: {class_id})\n"
             f"YOLO: [{class_id}, {x_center:.4f}, {y_center:.4f}, {width_norm:.4f}, {height_norm:.4f}]")
 
+
 # Main Gemini Analysis Section
 if st.session_state.cropped_img and st.session_state.crop_rect:
-    st.image(st.session_state.cropped_img, caption="Cropped Image for Gemini Analysis", width=400)
-    
+    st.image(st.session_state.cropped_img,
+             caption="Cropped Image for Gemini Analysis", width=365)
+
     if st.button("Analyze with Gemini") or st.session_state.analysis_done:
         if not st.session_state.analysis_done:
             with st.spinner("Gemini is analyzing the dental image..."):
                 try:
                     # Convert cropped image to bytes
                     image_bytes = pil_to_bytes(st.session_state.cropped_img)
-                    
+
                     # IMPROVED: Single pass with better prompt (no autoregression)
                     st.info("Analyzing dental image...")
-                    
+
                     response = gemini_model.generate_content(
-                        [IMPROVED_PROMPT, {"mime_type": "image/jpeg", "data": image_bytes}],
+                        [IMPROVED_PROMPT, {
+                            "mime_type": "image/jpeg", "data": image_bytes}],
                         generation_config=generation_config
                     )
-                    
+
                     # Safe text extraction
                     final_class = ""
                     if response.candidates and len(response.candidates) > 0:
                         candidate = response.candidates[0]
                         if hasattr(candidate, 'content') and candidate.content.parts:
-                            final_class = candidate.content.parts[0].text.strip()
+                            final_class = candidate.content.parts[0].text.strip(
+                            )
                         elif hasattr(response, 'text'):
                             final_class = response.text.strip()
-                    
+
                     if not final_class:
-                        st.warning(f"Analysis failed. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'Unknown'}")
-                        raise Exception("Could not get valid response from Gemini")
-                    
+                        st.warning(
+                            f"Analysis failed. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'Unknown'}")
+                        raise Exception(
+                            "Could not get valid response from Gemini")
+
                     # Clean up the response - remove quotes, markdown, extra text
-                    final_class = final_class.replace("'", "").replace('"', "").replace("`", "").strip()
-                    
+                    final_class = final_class.replace("'", "").replace(
+                        '"', "").replace("`", "").strip()
+
                     # Extract only the class name if there's additional text
                     for dental_class in DENTAL_CLASSES:
                         if dental_class.lower() in final_class.lower():
                             final_class = dental_class
                             break
-                    
+
                     st.success(f"Classification: {final_class}")
-                    
+
                     st.session_state.gemini_label = final_class
                     st.session_state.analysis_done = True
-                    
+
                 except Exception as e:
                     st.error(f"Error during Gemini analysis: {e}")
                     if 'response' in locals():
@@ -880,16 +900,17 @@ if st.session_state.cropped_img and st.session_state.crop_rect:
                         # Show the raw response for debugging
                         if response.candidates:
                             st.code(str(response.candidates[0]))
-                    st.info("Try re-cropping the image or uploading a clearer dental image.")
-        
+                    st.info(
+                        "Try re-cropping the image or uploading a clearer dental image.")
+
         # Display results
         if st.session_state.gemini_label:
             class_id = map_class_to_id(st.session_state.gemini_label)
-            
+
             st.success("Gemini Classification Complete!")
             st.markdown(f"### Detected: **{st.session_state.gemini_label}**")
             st.markdown(f"**Class ID:** {class_id} (out of 44 classes)")
-            
+
             # Highlight the detected class
             with st.expander("View all 44 classes"):
                 for idx, cls in enumerate(DENTAL_CLASSES):
@@ -897,7 +918,7 @@ if st.session_state.cropped_img and st.session_state.crop_rect:
                         st.markdown(f"**{idx}: {cls}** <- Detected")
                     else:
                         st.markdown(f"{idx}: {cls}")
-            
+
             # Save button
             if st.button("Save Gemini Label + Original Image"):
                 if st.session_state.original_uploaded_img is not None:
@@ -908,33 +929,9 @@ if st.session_state.cropped_img and st.session_state.crop_rect:
                         st.session_state.original_uploaded_img
                     )
                 else:
-                    st.error("Original image not found. Please upload an image first.")
-            
-            # Chat interface section
-            st.divider()
-            st.subheader("Chat with Gemini about this diagnosis")
-            
-            default_question = f"Explain '{st.session_state.gemini_label}', its causes, prevention and treatment."
-            user_input = st.text_input("Ask a question:", value=default_question)
-            
-            if st.button("Ask Gemini") and user_input:
-                try:
-                    image_bytes = pil_to_bytes(st.session_state.cropped_img)
-                    resp = gemini_model.generate_content(
-                        [user_input, {"mime_type": "image/jpeg", "data": image_bytes}],
-                        generation_config=chat_generation_config
-                    )
-                    reply = getattr(resp, "text", "No response received.")
-                    st.session_state.chat_history.append((user_input, reply.strip()))
-                except Exception as e:
-                    st.error(f"Chat error: {e}")
-            
-            # Display chat history
-            if st.session_state.chat_history:
-                st.markdown("### Chat History")
-                for q, a in st.session_state.chat_history:
-                    st.markdown(f"**You:** {q}")
-                    st.markdown(f"**Gemini:** {a}")
-                    st.divider()
+                    st.error(
+                        "Original image not found. Please upload an image first.")
+
 else:
-    st.warning("Please crop an area from the detected image first to analyze with Gemini.")
+    st.warning(
+        "Please crop an area from the detected image first to analyze with Gemini.")
