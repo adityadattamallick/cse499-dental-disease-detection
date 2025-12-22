@@ -165,7 +165,7 @@ if source_radio == settings.IMAGE:
                 )
                 # Save detected image for annotation
                 st.session_state.img_file = Image.fromarray(res_plotted)
-                st.session_state.img_file.save("detected_image.jpg")
+                st.session_state.img_file.save(os.path.join(settings.ROOT, "detected_image.jpg"))
 
 # ANNOTATION TOOL
 st.title("Annotation Tool")
@@ -505,22 +505,23 @@ def save_original_with_yolo_label(
     width_norm = crop_rect["width"] / img_width
     height_norm = crop_rect["height"] / img_height
 
-    # Create output directory for original images
-    os.makedirs("original-labels", exist_ok=True)
+    # Create output directory for original images inside ROOT
+    output_dir = os.path.join(settings.ROOT, "original-labels")
+    os.makedirs(output_dir, exist_ok=True)
 
     # Convert RGBA to RGB if necessary
     if original_img.mode in ("RGBA", "LA"):
         original_img = original_img.convert("RGB")
 
     # APPEND to existing label file
-    label_path = os.path.join("original-labels", f"{base_filename}.txt")
-    with open(label_path, "a") as f:  # Changed from "w" to "a"
+    label_path = os.path.join(output_dir, f"{base_filename}.txt")
+    with open(label_path, "a") as f:  # append mode
         f.write(
             f"{label} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n"
         )
 
     # Save original image only if it doesn't exist
-    image_path = os.path.join("original-labels", f"{base_filename}.jpg")
+    image_path = os.path.join(output_dir, f"{base_filename}.jpg")
     if not os.path.exists(image_path):
         original_img.save(image_path)
         st.success(f"Saved original image: {image_path}")
@@ -810,21 +811,23 @@ def save_gemini_yolo_label(detected_img, crop_rect, class_name, original_img):
     width_norm = scaled_crop_rect["width"] / orig_width
     height_norm = scaled_crop_rect["height"] / orig_height
 
-    # Create output directory
-    os.makedirs("gemini-labels", exist_ok=True)
+    # Create output directory for gemini labels inside ROOT
+    gemini_dir = os.path.join(settings.ROOT, "gemini-labels")
+    os.makedirs(gemini_dir, exist_ok=True)
 
     # Convert RGBA to RGB if necessary
     if original_img.mode in ("RGBA", "LA"):
         original_img = original_img.convert("RGB")
 
-    # APPEND to existing label file
-    label_path = os.path.join("gemini-labels", f"{base_filename}.txt")
-    with open(label_path, "a") as f:  # Changed from "w" to "a"
+    # Append to existing label file
+    label_path = os.path.join(gemini_dir, f"{base_filename}.txt")
+    with open(label_path, "a") as f:
         f.write(
-            f"{class_id} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n")
+            f"{class_id} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}\n"
+        )
 
     # Save original image only if it doesn't exist
-    image_path = os.path.join("gemini-labels", f"{base_filename}.jpg")
+    image_path = os.path.join(gemini_dir, f"{base_filename}.jpg")
     if not os.path.exists(image_path):
         original_img.save(image_path)
         st.success(f"Saved original image: {image_path}")
