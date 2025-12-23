@@ -938,3 +938,350 @@ if st.session_state.cropped_img and st.session_state.crop_rect:
 else:
     st.warning(
         "Please crop an area from the detected image first to analyze with Gemini.")
+
+# GEMINI DETECTION SECTION
+st.title("Gemini AI Detection - Full Image Analysis")
+
+# Comprehensive detection prompt with structured output requirements
+GEMINI_DETECTION_PROMPT = """You are an expert dental diagnostician. Analyze this dental image and detect ALL visible dental features.
+
+CLASSES (0-43):
+TEETH: 11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48
+CONDITIONS: amalgam filling, calculus, fixed prosthesis, incisive papilla, non-carious lesion, palatine raphe, staining or visible changes without cavitation, temporary restoration, tongue, tooth coloured filling, visible changes with cavitation, visible changes with microcavitation
+
+For EACH visible feature, return:
+- class: exact class name from list above
+- bbox: [x_min, y_min, x_max, y_max] in percentages (0-100)
+- confidence: high/medium/low
+
+Return ONLY a JSON array:
+[
+  {"class": "48", "bbox": [10, 20, 25, 45], "confidence": "high"},
+  {"class": "calculus", "bbox": [30, 50, 40, 60], "confidence": "medium"}
+]
+
+Focus on visible pathologies first, then teeth. Limit to 15 most significant features."""
+
+
+def parse_gemini_json(response_text: str):
+    """
+    Parse JSON response from Gemini with automatic error recovery.
+    Attempts to fix common JSON formatting issues and validates detection structure.
+    """
+    import json
+    import re
+    
+    try:
+        # Clean up markdown code blocks and whitespace
+        text = response_text.strip()
+        text = re.sub(r'```json\s*', '', text)
+        text = re.sub(r'```\s*$', '', text)
+        text = text.strip()
+        
+        # Attempt to auto-close incomplete JSON structures
+        if not text.endswith(']'):
+            open_brackets = text.count('[') - text.count(']')
+            open_braces = text.count('{') - text.count('}')
+            
+            if open_braces > 0:
+                text = text.rstrip(',\n ')
+                text += '}' * open_braces
+            if open_brackets > 0:
+                text += ']' * open_brackets
+        
+        detections = json.loads(text)
+        
+        if not isinstance(detections, list):
+            return []
+        
+        # Validate each detection has required fields
+        valid = []
+        for det in detections:
+            if (isinstance(det, dict) and 
+                "class" in det and 
+                "bbox" in det and 
+                isinstance(det["bbox"], list) and 
+                len(det["bbox"]) == 4):
+                valid.append(det)
+        
+        return valid
+        
+    except Exception as e:
+        st.error(f"JSON parsing error: {e}")
+        with st.expander("View raw response"):
+            st.code(response_text)
+        return []
+
+
+def create_segmentation_mask(bbox, img_width, img_height):
+    """
+    Convert bounding box to polygon mask for YOLOv8 segmentation format.
+    Returns normalized polygon coordinates as a simple rectangle.
+    """
+    x_min, y_min, x_max, y_max = bbox
+    
+    # Convert percentage coordinates to normalized 0-1 range
+    x_min_norm = x_min / 100.0
+    y_min_norm = y_min / 100.0
+    x_max_norm = x_max / 100.0
+    y_max_norm = y_max / 100.0
+    
+    # Create rectangular polygon with 4 corner points
+    polygon = [
+        x_min_norm, y_min_norm,  # top-left
+        x_max_norm, y_min_norm,  # top-right
+        x_max_norm, y_max_norm,  # bottom-right
+        x_min_norm, y_max_norm   # bottom-left
+    ]
+    
+    return polygon
+
+
+def draw_detections_with_masks(image, detections, dpi=640):
+    """
+    Render bounding boxes, semi-transparent masks, and bold labels on the image.
+    Uses color-coded overlays for different detections.
+    High DPI setting ensures crisp, publication-quality output.
+    """
+    from PIL import ImageDraw, ImageFont
+    import numpy as np
+    
+    img_width, img_height = image.size
+    img_array = np.array(image)
+    
+    # Create transparent overlay layer for masks
+    overlay = Image.new('RGBA', image.size, (255, 255, 255, 0))
+    draw_overlay = ImageDraw.Draw(overlay)
+    draw_main = ImageDraw.Draw(image)
+    
+    # Distinct color palette for visual separation
+    colors = [
+        (255, 107, 107), (78, 205, 196), (69, 183, 209), (255, 160, 122),
+        (152, 216, 200), (247, 220, 111), (187, 143, 206), (133, 193, 226),
+        (248, 183, 57), (82, 183, 136), (255, 99, 132), (54, 162, 235)
+    ]
+    
+    # Load fonts with fallback to default
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+    except:
+        font = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+    
+    for idx, det in enumerate(detections):
+        class_name = det.get("class", "unknown")
+        bbox = det.get("bbox", [])
+        confidence = det.get("confidence", "unknown")
+        
+        if len(bbox) != 4:
+            continue
+        
+        # Convert percentage coordinates to pixel coordinates
+        x_min = int(bbox[0] * img_width / 100)
+        y_min = int(bbox[1] * img_height / 100)
+        x_max = int(bbox[2] * img_width / 100)
+        y_max = int(bbox[3] * img_height / 100)
+        
+        color = colors[idx % len(colors)]
+        color_rgba = (*color, 80)
+        
+        # Draw semi-transparent filled mask
+        draw_overlay.rectangle([x_min, y_min, x_max, y_max], fill=color_rgba)
+        
+        # Draw solid bounding box outline with increased width
+        draw_main.rectangle([x_min, y_min, x_max, y_max], outline=color, width=4)
+        
+        # Prepare label text
+        label_text = f"{class_name}"
+        conf_text = f"{confidence}"
+        
+        # Calculate label background dimensions
+        bbox_label = draw_main.textbbox((x_min, y_min - 45), label_text, font=font)
+        bbox_conf = draw_main.textbbox((x_min, y_min - 22), conf_text, font=font_small)
+        
+        # Draw solid background for label
+        draw_main.rectangle([bbox_label[0]-4, bbox_label[1]-4, bbox_label[2]+4, bbox_label[3]+4], fill=color)
+        
+        # Draw text with increased weight for visibility
+        draw_main.text((x_min, y_min - 45), label_text, fill="white", font=font, stroke_width=2, stroke_fill="black")
+        draw_main.text((x_min, y_min - 22), conf_text, fill="white", font=font_small, stroke_width=1, stroke_fill="black")
+    
+    # Composite overlay onto main image
+    image = image.convert('RGBA')
+    image = Image.alpha_composite(image, overlay)
+    image = image.convert('RGB')
+    
+    return image
+
+
+def save_yolo_segmentation_format(detections, img_width, img_height, base_filename):
+    """
+    Export detections to YOLOv8 segmentation format text file.
+    Format: <class_id> <x1> <y1> <x2> <y2> <x3> <y3> <x4> <y4>
+    """
+    output_dir = os.path.join(settings.ROOT, "gemini-detection-labels")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    label_path = os.path.join(output_dir, f"{base_filename}.txt")
+    
+    with open(label_path, "w") as f:
+        for det in detections:
+            class_name = det.get("class", "")
+            bbox = det.get("bbox", [])
+            
+            if len(bbox) != 4:
+                continue
+            
+            # Map class name to numeric ID
+            class_id = map_class_to_id(class_name)
+            if class_id == -1:
+                st.warning(f"Unknown class: {class_name}")
+                continue
+            
+            # Generate polygon mask from bounding box
+            polygon = create_segmentation_mask(bbox, img_width, img_height)
+            
+            # Write in YOLOv8 segmentation format
+            line = f"{class_id} " + " ".join([f"{coord:.6f}" for coord in polygon])
+            f.write(line + "\n")
+    
+    return label_path
+
+
+# Main Gemini Detection Interface
+if st.session_state.original_uploaded_img is not None:
+    st.markdown("---")
+    st.info("Gemini will analyze the complete image and detect all dental features with bounding boxes and segmentation masks.")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Original Image")
+        st.image(st.session_state.original_uploaded_img, use_container_width=True)
+    
+    if st.button("Run Gemini Detection", type="primary", use_container_width=True):
+        with st.spinner("Gemini is analyzing the dental image..."):
+            try:
+                # Convert image to bytes for API transmission
+                image_bytes = pil_to_bytes(st.session_state.original_uploaded_img)
+                
+                # Configure Gemini generation parameters for balanced performance
+                # Lower temperature for more focused, deterministic outputs
+                # Top-p and top-k control token sampling diversity
+                detection_config = genai.types.GenerationConfig(
+                    temperature=0.2,      # Low temperature for consistent, focused responses
+                    top_p=0.95,          # Nucleus sampling - considers top 95% probability mass
+                    top_k=40,            # Limits sampling to top 40 most likely tokens
+                    max_output_tokens=8192,
+                )
+                
+                # Send request to Gemini API
+                response = gemini_model.generate_content(
+                    [GEMINI_DETECTION_PROMPT, {"mime_type": "image/jpeg", "data": image_bytes}],
+                    generation_config=detection_config
+                )
+                
+                # Extract text response from API result
+                response_text = ""
+                if response.candidates and len(response.candidates) > 0:
+                    candidate = response.candidates[0]
+                    if hasattr(candidate, 'content') and candidate.content.parts:
+                        response_text = candidate.content.parts[0].text.strip()
+                    elif hasattr(response, 'text'):
+                        response_text = response.text.strip()
+                
+                if not response_text:
+                    st.error("No response from Gemini")
+                    st.stop()
+                
+                # Parse JSON response into detection objects
+                detections = parse_gemini_json(response_text)
+                
+                if not detections:
+                    st.warning("No valid detections found")
+                    st.stop()
+                
+                st.success(f"Detected {len(detections)} dental features!")
+                
+                # Display detailed detection information
+                with st.expander(f"View All {len(detections)} Detections"):
+                    for i, det in enumerate(detections, 1):
+                        class_name = det.get('class', 'unknown')
+                        class_id = map_class_to_id(class_name)
+                        confidence = det.get('confidence', 'N/A')
+                        bbox = det.get('bbox', [])
+                        
+                        st.markdown(f"""
+                        **{i}. {class_name}** (ID: {class_id})
+                        - Confidence: {confidence}
+                        - BBox: [{bbox[0]:.1f}, {bbox[1]:.1f}, {bbox[2]:.1f}, {bbox[3]:.1f}]
+                        """)
+                
+                # Get image dimensions for coordinate conversion
+                img_width, img_height = st.session_state.original_uploaded_img.size
+                
+                # Save labels in YOLOv8 format
+                base_filename = st.session_state.original_image_filename or get_unique_filename()
+                label_path = save_yolo_segmentation_format(
+                    detections, img_width, img_height, base_filename
+                )
+                st.success(f"Labels saved: `{label_path}`")
+                
+                # Render detections on image copy with high DPI
+                detected_image = draw_detections_with_masks(
+                    st.session_state.original_uploaded_img.copy(),
+                    detections,
+                    dpi=640
+                )
+                
+                # Create output directory for saving both original and detected images
+                output_img_dir = os.path.join(settings.ROOT, "gemini-detected-images")
+                os.makedirs(output_img_dir, exist_ok=True)
+                
+                # Save original image in the same folder
+                original_img_path = os.path.join(output_img_dir, f"{base_filename}_original.jpg")
+                original_img_to_save = st.session_state.original_uploaded_img.copy()
+                if original_img_to_save.mode in ("RGBA", "LA"):
+                    original_img_to_save = original_img_to_save.convert("RGB")
+                original_img_to_save.save(original_img_path, dpi=(640, 640))
+                st.success(f"Original image saved: `{original_img_path}`")
+                
+                # Save annotated image with high DPI
+                detected_img_path = os.path.join(output_img_dir, f"{base_filename}_detected.jpg")
+                
+                if detected_image.mode in ("RGBA", "LA"):
+                    detected_image = detected_image.convert("RGB")
+                
+                detected_image.save(detected_img_path, dpi=(640, 640))
+                st.success(f"Detected image saved: `{detected_img_path}`")
+                
+                # Display annotated result
+                with col2:
+                    st.subheader("Detected Image")
+                    st.image(detected_image, use_container_width=True)
+                
+                # Show detection statistics
+                st.markdown("---")
+                st.subheader("Detection Summary")
+                col_a, col_b, col_c = st.columns(3)
+                
+                with col_a:
+                    st.metric("Total Detections", len(detections))
+                
+                with col_b:
+                    high_conf = sum(1 for d in detections if d.get('confidence') == 'high')
+                    st.metric("High Confidence", high_conf)
+                
+                with col_c:
+                    unique_classes = len(set(d.get('class') for d in detections))
+                    st.metric("Unique Classes", unique_classes)
+                
+            except Exception as e:
+                st.error(f"Error during detection: {e}")
+                import traceback
+                with st.expander("View error details"):
+                    st.code(traceback.format_exc())
+
+else:
+    st.warning("Please upload an image first to use Gemini Detection.")
