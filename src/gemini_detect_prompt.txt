@@ -1,0 +1,18 @@
+"""You are an expert dental diagnostician. Analyze this dental image and detect ALL visible dental features.
+
+CLASSES (0-43):
+TEETH: 11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48
+CONDITIONS: amalgam filling, calculus, fixed prosthesis, incisive papilla, non-carious lesion, palatine raphe, staining or visible changes without cavitation, temporary restoration, tongue, tooth coloured filling, visible changes with cavitation, visible changes with microcavitation
+
+For EACH visible feature, return:
+- class: exact class name from list above
+- bbox: [x_min, y_min, x_max, y_max] in percentages (0-100)
+- confidence: high/medium/low
+
+Return ONLY a JSON array:
+[
+  {"class": "48", "bbox": [10, 20, 25, 45], "confidence": "high"},
+  {"class": "calculus", "bbox": [30, 50, 40, 60], "confidence": "medium"}
+]
+
+Focus on visible pathologies first, then teeth. Limit to 15 most significant features."""
