@@ -2,29 +2,30 @@
 
 ## CSE499 - Senior Design Capstone Project
 
-A deep learning-based system for automated detection and localization of dental diseases in oral photographs using YOLOv8 object detection framework.
+A deep learning-based system for automated detection and localization of dental diseases in oral photographs using YOLOv8 object detection framework with Gemini AI-powered image analysis.
 
 ## Overview
 
-This project implements a state-of-the-art dental disease detection system using PyTorch and YOLOv8. The system is capable of identifying and localizing various dental conditions from custom dental photographs, providing an automated solution to assist dental professionals in diagnosis and treatment planning.
+This project implements a state-of-the-art dental disease detection system using PyTorch and YOLOv8. The system is capable of identifying and localizing various dental conditions from custom dental photographs, providing an automated solution to assist dental professionals in diagnosis and treatment planning. Enhanced with Gemini 2.5 Flash for intelligent image analysis and labeling.
 
 ## Features
 
 - **Multi-disease Detection**: Detects various dental diseases including caries, gingivitis, calculus, and other oral conditions
 - **Real-time Inference**: Fast detection using optimized YOLOv8 architecture
+- **Gemini AI Integration**: Gemini 2.5 Flash image analysis to label specific regions or detect and label the whole image
 - **Custom Dataset**: Trained on a curated dataset of dental photographs
-- **YOLOv8 Format**: Utilizes industry-standard YOLOv8 annotation format for training
+- **YOLOv8 Segmentation Format**: Utilizes industry-standard YOLOv8 segmentation format with class coordinates
+- **Interactive Web Interface**: Streamlit-based application for easy deployment and usage
 - **Pre-trained Checkpoint**: Includes best performing model checkpoint for immediate deployment
 
 ## Technical Architecture
 
 - **Framework**: PyTorch
 - **Model**: YOLOv8 (You Only Look Once v8)
+- **AI Assistant**: Gemini 2.5 Flash API
 - **Input**: Custom dental photographs (RGB images)
-- **Annotation Format**: YOLOv8 format (converted from JSON to TXT labels)
-- **Task**: Object Detection and Localization
-
-<!--## Project Structure-->
+- **Annotation Format**: YOLOv8 segmentation format with class coordinates
+- **Task**: Object Detection, Segmentation, and Localization
 
 ## Installation
 
@@ -32,6 +33,7 @@ This project implements a state-of-the-art dental disease detection system using
 
 - Python 3.8+
 - CUDA-capable GPU (recommended for training)
+- Gemini API Key (for AI-powered analysis)
 
 ### Setup
 
@@ -52,41 +54,35 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+4. Configure Gemini API:
+
+Create a `.env` file in the project root directory and add your Gemini API key:
+```
+GEMINI_API_KEY="your_gemini_api_key_here"
+```
+Replace `your_gemini_api_key_here` with your actual Gemini API key.
+
 ## Usage
 
-### Training
+### Running the Application
 
-To train the model on your custom dataset:
-
+Navigate to the project's `src` folder and run the Streamlit application:
 ```bash
-python train.py --data config.yaml --epochs 100 --batch 16 --img 640
+cd src
+streamlit run app.py
 ```
 
-### Prediction on Single Image
-
-```python
-from ultralytics import YOLO
-
-# Load the trained model
-model = YOLO('best.pt')
-
-# Run inference
-results = model.predict('path/to/dental/image.jpg', conf=0.3)
-
-# Display results
-results[0].show()
-```
+The application will open in your default web browser, providing an interactive interface for dental disease detection and analysis.
 
 ## Dataset
 
-- **Format**: YOLOv8 annotation format
-- **Initial Format**: JSON labels (converted to TXT)
+- **Format**: YOLOv8 segmentation format with class coordinates
 - **Image Type**: Custom dental photographs
 - **Classes**: Multiple dental disease categories
 
-The dataset follows YOLOv8 annotation standards where each image has a corresponding `.txt` file with normalized bounding box coordinates:
+The dataset follows YOLOv8 segmentation annotation standards where each image has a corresponding `.txt` file with normalized polygon coordinates:
 ```
-class_id center_x center_y width height
+class_id x1 y1 x2 y2 x3 y3 ... xn yn
 ```
 
 ## Dataset Details
@@ -109,17 +105,19 @@ These tables provide comprehensive information about the disease classes, their 
 ## Model Performance
 
 - **Metrics**
-  - mAP@0.5
-  - mAP@0.5:0.95
+  - Box mAP@0.5
+  - Box mAP@0.5:0.95
+  - Mask mAP@0.5
+  - Mask mAP@0.5:0.95
 
 ## Methodology
 
 1. **Data Collection**: Curated custom dataset of dental photographs
-2. **Annotation**: Initial JSON format annotations converted to YOLOv8 TXT format
-3. **Preprocessing**: Image normalization and augmentation
+2. **Annotation**: YOLOv8 segmentation format with class coordinates
+3. **Preprocessing**: Image augmentation
 4. **Training**: YOLOv8 model trained with PyTorch backend
 5. **Validation**: Cross-validation and testing on holdout set
-6. **Deployment**: Optimized checkpoint for inference
+6. **Deployment**: Optimized checkpoint for inference with Streamlit interface
 
 ## Requirements
 
@@ -131,6 +129,8 @@ See `requirements.txt` for complete list of dependencies. Key libraries include:
 - NumPy
 - Matplotlib
 - Pillow
+- Streamlit
+- Google Generative AI (Gemini)
 
 ## Contributing
 
@@ -146,7 +146,6 @@ This is a Senior Design Capstone project. For collaboration or questions, please
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-```
 MIT License
 
 Copyright (c) 2025 Aditya Narayan Datta Mallick
@@ -168,12 +167,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-```
 
 ## Acknowledgments
 
-- YOLOv8 by Ultralytics
-- PyTorch team
 - Saif Ahmed
 - Dr Nabeel Mohammed
 
@@ -181,7 +177,8 @@ THE SOFTWARE.
 
 - [YOLOv8 Documentation](https://docs.ultralytics.com/)
 - [PyTorch Documentation](https://pytorch.org/docs/)
+- [Streamlit Documentation](https://docs.streamlit.io/)
 - [Streamlit Cropper Tool](https://github.com/turner-anderson/streamlit-cropper)
+- [Google Gemini API](https://ai.google.dev/)
 
 ---
-
