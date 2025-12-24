@@ -943,24 +943,42 @@ else:
 st.title("Gemini AI Detection - Full Image Analysis")
 
 # Comprehensive detection prompt with structured output requirements
-GEMINI_DETECTION_PROMPT = """You are an expert dental diagnostician. Analyze this dental image and detect ALL visible dental features.
+GEMINI_DETECTION_PROMPT = """You are an expert dental diagnostician with computer vision capabilities. Analyze this dental image and detect ALL visible dental features with MAXIMUM PRECISION.
 
 CLASSES (0-43):
 TEETH: 11, 12, 13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48
 CONDITIONS: amalgam filling, calculus, fixed prosthesis, incisive papilla, non-carious lesion, palatine raphe, staining or visible changes without cavitation, temporary restoration, tongue, tooth coloured filling, visible changes with cavitation, visible changes with microcavitation
 
-For EACH visible feature, return:
-- class: exact class name from list above
-- bbox: [x_min, y_min, x_max, y_max] in percentages (0-100)
-- confidence: high/medium/low
+DETECTION INSTRUCTIONS:
+1. Identify each visible tooth and dental condition
+2. For EACH feature, draw a tight bounding box around it
+3. Measure the box position as percentages of image dimensions (0-100%)
+4. Report coordinates with HIGH PRECISION (use decimals: 45.7%, not 45%)
 
-Return ONLY a JSON array:
+BOUNDING BOX FORMAT: [x_min, y_min, x_max, y_max]
+- x_min: left edge position (%)
+- y_min: top edge position (%)
+- x_max: right edge position (%)
+- y_max: bottom edge position (%)
+- USE DECIMAL VALUES for accuracy (e.g., 23.5, 47.8, 65.2)
+
+CONFIDENCE LEVELS:
+- high: clearly visible, no ambiguity
+- medium: visible but some uncertainty
+- low: barely visible or unclear
+
+Return ONLY valid JSON array with precise measurements:
 [
-  {"class": "48", "bbox": [10, 20, 25, 45], "confidence": "high"},
-  {"class": "calculus", "bbox": [30, 50, 40, 60], "confidence": "medium"}
+  {"class": "tooth_number_or_condition", "bbox": [x_min, y_min, x_max, y_max], "confidence": "high/medium/low"}
 ]
 
-Focus on visible pathologies first, then teeth. Limit to 15 most significant features."""
+EXAMPLE OUTPUT:
+[
+  {"class": "48", "bbox": [15.3, 22.7, 28.9, 51.2], "confidence": "high"},
+  {"class": "calculus", "bbox": [31.5, 48.2, 39.7, 56.8], "confidence": "medium"}
+]
+
+Prioritize visible pathologies, then teeth. Maximum 15 most significant detections."""
 
 
 def parse_gemini_json(response_text: str):
@@ -996,13 +1014,25 @@ def parse_gemini_json(response_text: str):
         
         # Validate each detection has required fields
         valid = []
+        has_integer_coords = False
+        
         for det in detections:
             if (isinstance(det, dict) and 
                 "class" in det and 
                 "bbox" in det and 
                 isinstance(det["bbox"], list) and 
                 len(det["bbox"]) == 4):
+                
+                # Check if all coordinates are integers (lack precision)
+                bbox = det["bbox"]
+                if all(isinstance(coord, (int, float)) and coord == int(coord) for coord in bbox):
+                    has_integer_coords = True
+                
                 valid.append(det)
+        
+        # Warn user if coordinates lack precision
+        if has_integer_coords:
+            st.warning("Gemini returned integer coordinates. Bounding boxes may not be precise. Consider re-running or refining the image.")
         
         return valid
         
