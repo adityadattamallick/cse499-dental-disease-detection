@@ -74,6 +74,8 @@ streamlit run app.py
 
 The application will open in your default web browser, providing an interactive interface for dental disease detection and analysis.
 
+**Note**: In the root directory, put your model's best checkpoint ***"best.pt"*** in a folder naming it as **"weights"**. (It existis already, if not, then use do as per the instruction)  
+***Important for Using the Application***: After running the application, a image (for detection/for making corrected labels) must be uploaded to proceed to the annotation tool.
 ## Dataset
 
 - **Format**: YOLOv8 segmentation format with class coordinates
